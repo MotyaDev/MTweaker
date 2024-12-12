@@ -66,7 +66,7 @@ class WorkerThread(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('All Tweaker Beta')
+        self.setWindowTitle('Moti Tweaker Beta')
         
         # Основной виджет и layout
         self.central_widget = QWidget()
