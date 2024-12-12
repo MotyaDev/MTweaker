@@ -1,344 +1,210 @@
-import tkinter as tk
-from tkinter import ttk
-from tkinter import StringVar
-import ttkbootstrap as ttk
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget, 
+    QCheckBox, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QLineEdit, 
+    QScrollArea, QLabel, QFrame, QGridLayout, QProgressBar)
+from PySide6.QtCore import Qt, QSize, QThread, Signal
+from PySide6.QtGui import QFont
+import sys
+import configparser
 import os
 import subprocess
 import getpass
 from datetime import datetime
-import datetime
-import configparser
-
-import sys
-sys.path.insert(0, './tweaks')
-
-from tabs import tabs
 
 # Создаем конфигурационный файл
 config = configparser.ConfigParser()
 config.read('settings.ini')
 
-class ToolTip:
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tooltip = None
-        self.widget.bind("<Enter>", self.show_tooltip)
-        self.widget.bind("<Leave>", self.hide_tooltip)
+sys.path.insert(0, './tweaks')
 
-    def show_tooltip(self, event):
-        x, y, _, _ = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 25
+from tabs import tabs
 
-        self.tooltip = tk.Toplevel(self.widget)
-        self.tooltip.wm_overrideredirect(True)
-        self.tooltip.wm_geometry(f"+{x}x{y}")
+class WorkerThread(QThread):
+    progress = Signal(int)
+    finished = Signal()
+    status = Signal(str)
 
-        label = tk.Label(self.tooltip, text=self.text, background="#ffffe0", relief="solid", borderwidth=1)
-        label.pack()
+    def __init__(self, checkboxes):
+        super().__init__()
+        self.checkboxes = checkboxes
+        self.is_running = True
 
-    def hide_tooltip(self, event):
-        if self.tooltip:
-            self.tooltip.destroy()
-            self.tooltip = None
+    def run(self):
+        total_tasks = sum(sum(1 for checkbox in tab_checkboxes.values() if checkbox.isChecked())
+                         for tab_checkboxes in self.checkboxes.values())
+        completed_tasks = 0
 
-def select_all_for_tabs(tab_frame):
-    select_all_checkbox_var = tk.BooleanVar()
-    select_all_checkbox = ttk.Checkbutton(tab_frame, text='Выделить всё', variable=select_all_checkbox_var)
-    select_all_checkbox.grid(row=0, column=0, sticky='w')
+        for tab_name, tab_checkboxes in self.checkboxes.items():
+            if not self.is_running:
+                break
+                
+            for checkbox_name, checkbox in tab_checkboxes.items():
+                if not self.is_running:
+                    break
+                    
+                if checkbox.isChecked():
+                    self.status.emit(f"Выполняется: {checkbox_name}")
+                    
+                    if checkbox_name.endswith(".bat"):
+                        subprocess.call(f'tweaks\\"{tab_name}\\{checkbox_name}"', shell=True)
+                    elif checkbox_name.endswith(".ps1"):
+                        subprocess.run(['Utils\\launcher.exe', 
+                                      f'powershell.exe -ExecutionPolicy Bypass -File tweaks\\"{tab_name}\\{checkbox_name}"'])
+                    elif checkbox_name.endswith(".reg"):
+                        subprocess.call(f'Utils\\PowerRun.exe tweaks\\"{tab_name}\\{checkbox_name}"', shell=True)
+                    else:
+                        subprocess.call(f'tweaks\\"{tab_name}\\{checkbox_name}"', shell=True)
+                    
+                    completed_tasks += 1
+                    progress = int((completed_tasks / total_tasks) * 100)
+                    self.progress.emit(progress)
 
-    def select_all():
-        select_state = select_all_checkbox_var.get()
-        for checkbox in checkboxes.values():
-            checkbox.set(select_state)
+        self.finished.emit()
 
-    select_all_checkbox.configure(command=select_all)
+    def stop(self):
+        self.is_running = False
 
-def execute_old():
-    for checkbox_name, checkbox_var in checkboxes.items():
-        if checkbox_var.get():
-            tab_name = get_tab_name(checkbox_name)  # get the tab name from the checkbox name
-            print(f'tweaks\\"{tab_name}\\{checkbox_name}"')
-            if checkbox_name.endswith(".bat"):
-                subprocess.call(f'tweaks\\"{tab_name}\\{checkbox_name}"', shell=True)
-            elif checkbox_name.endswith(".ps1"):
-                print("usage of JetBrains WinElevator (https://github.com/JetBrains/intellij-community/tree/master/native/WinElevator)")
-                subprocess.run(['Utils\\launcher.exe', f'powershell.exe -ExecutionPolicy Bypass -File tweaks\\"{tab_name}\\{checkbox_name}"'])
-            elif checkbox_name.endswith(".reg"):
-                subprocess.call(f'Utils\\PowerRun.exe tweaks\\"{tab_name}\\{checkbox_name}"', shell=True)
-            else:
-                subprocess.call(f'tweaks\\"{tab_name}\\{checkbox_name}"', shell=True)
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle('All Tweaker Beta')
+        
+        # Основной виджет и layout
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        
+        # Кнопка выполнить
+        self.execute_button = QPushButton('Выполнить')
+        self.execute_button.clicked.connect(self.execute)
+        self.main_layout.addWidget(self.execute_button)
+        
+        # Поле поиска
+        self.search_entry = QLineEdit()
+        self.search_entry.textChanged.connect(self.update_checkboxes)
+        self.main_layout.addWidget(self.search_entry)
+        
+        # Вкладки
+        self.tab_widget = QTabWidget()
+        self.main_layout.addWidget(self.tab_widget)
+        
+        # Создание вкладок
+        self.checkboxes = {}
+        for tab_name, checkbox_names in tabs.items():
+            scroll = QScrollArea()
+            tab_widget = QWidget()
+            tab_layout = QVBoxLayout(tab_widget)
+            tab_layout.setSpacing(2)  # Уменьшаем отступ между элементами
+            
+            # Добавляем кнопку "Выделить всё"
+            select_all_btn = QPushButton('Выделить всё')
+            select_all_btn.clicked.connect(lambda checked, t=tab_name: self.select_all_in_tab(t))
+            tab_layout.addWidget(select_all_btn)
+            
+            # Контейнер для чекбоксов
+            checkbox_widget = QWidget()
+            grid = QGridLayout(checkbox_widget)
+            grid.setSpacing(2)  # Уменьшаем отступ между чекбоксами
+            
+            # Выбор количества колонок
+            num_columns = 2
+            if tab_name == 'База':
+                num_columns = 4
+            elif tab_name in ['Обновления', 'Поддержка']:
+                num_columns = 1
+            elif tab_name == 'Программы':
+                num_columns = 3
+                
+            # Создание чекбоксов
+            self.checkboxes[tab_name] = {}  # Словарь для чекбоксов текущей вкладки
+            for i, checkbox_name in enumerate(checkbox_names):
+                checkbox = QCheckBox(checkbox_name)
+                grid.addWidget(checkbox, i // num_columns + 1, i % num_columns)
+                self.checkboxes[tab_name][checkbox_name] = checkbox
+                
+            tab_layout.addWidget(checkbox_widget)
+            scroll.setWidget(tab_widget)
+            scroll.setWidgetResizable(True)
+            self.tab_widget.addTab(scroll, tab_name)
+        
+        # Добавляем прогресс-бар и статус
+        status_layout = QHBoxLayout()
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        status_layout.addWidget(self.progress_bar)
+        
+        self.status_label = QLabel()
+        self.status_label.setVisible(False)
+        status_layout.addWidget(self.status_label)
+        
+        # Кнопка отмены
+        self.cancel_button = QPushButton("Отменить")
+        self.cancel_button.setVisible(False)
+        self.cancel_button.clicked.connect(self.cancel_execution)
+        status_layout.addWidget(self.cancel_button)
+        
+        self.main_layout.addLayout(status_layout)
+        
+        self.worker = None
 
-def create_batch_file(activated_checkboxes):
-    filename = f"Configs\\Config All Tweaker {datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')}.bat"
-    # создаем папку Configs, если она не существует
-    os.makedirs("Configs", exist_ok=True)
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write('@echo off\n')
-        f.write('chcp 65001\n')  # русская кодировка
-        for checkbox_name, checkbox_var in checkboxes.items():
-            if checkbox_var.get():
-                tab_name = get_tab_name(checkbox_name)  # get the tab name from the checkbox name
-                f.write(f'cmd /c "tweaks\\{tab_name}\\{checkbox_name}"\n')
-    return filename
+    def execute(self):
+        if self.worker and self.worker.isRunning():
+            return
 
-def update_config_file_list():
-    global config_file_values
-    config_file_values = [f for f in os.listdir('Configs') if f.endswith('.bat')]
-    config_file_dropdown['values'] = config_file_values
+        self.execute_button.setEnabled(False)
+        self.progress_bar.setVisible(True)
+        self.status_label.setVisible(True)
+        self.cancel_button.setVisible(True)
+        self.progress_bar.setValue(0)
 
-def execute():
-    activated_checkboxes = [checkbox_name for checkbox_name, checkbox_var in checkboxes.items() if checkbox_var.get()]
-    if execute_function_var.get() == 'Создать конфиг':
-        filename = create_batch_file(activated_checkboxes)
-        subprocess.call(f'"{filename}"', shell=True)
-        update_config_file_list()  # Обновляем список файлов конфигурации
-    elif execute_function_var.get() == 'Выполнить':
-        execute_old()
+        self.worker = WorkerThread(self.checkboxes)
+        self.worker.progress.connect(self.update_progress)
+        self.worker.status.connect(self.update_status)
+        self.worker.finished.connect(self.on_execution_finished)
+        self.worker.start()
 
-def get_tab_name(checkbox_name):
-    for tab_name, checkbox_names in tabs.items():
-        if checkbox_name in checkbox_names:
-            return tab_name
-    return None  # return None if the checkbox name is not found in any tab
+    def cancel_execution(self):
+        if self.worker and self.worker.isRunning():
+            self.worker.stop()
+            self.worker.wait()
+            self.on_execution_finished()
 
-def restart():
-    subprocess.run(['shutdown', '/r', '/t', '0'])
+    def update_progress(self, value):
+        self.progress_bar.setValue(value)
 
-# Создаем основное окно
-root = ttk.Window(themename=config['General']['theme'])
-root.title('All Tweaker Beta')
-root.attributes('-fullscreen', config.getboolean('Window', 'fullscreen'))
-subprocess.call(f"title All Tweaker Beta & mode con: cols={config['Window']['width']} lines={config['Window']['height']} & color a & echo Welcome to All Tweaker", shell=True)
+    def update_status(self, text):
+        self.status_label.setText(text)
 
-# Переменные для хранения текущего шрифта и темы
-checkbox_current_font = (config['General']['font_family'], int(config['General']['checkbox_font_size']))
-current_font = (config['General']['font_family'], int(config['General']['font_size']))
-current_theme = config['General']['theme']
+    def on_execution_finished(self):
+        self.execute_button.setEnabled(True)
+        self.progress_bar.setVisible(False)
+        self.status_label.setVisible(False)
+        self.cancel_button.setVisible(False)
+        self.status_label.clear()
 
-# Функция для обновления стиля элементов с учетом выбранного шрифта
-def update_font_style():
-    style = ttk.Style()
-    style.configure('TLabel', font=current_font)
-    style.configure('TButton', font=current_font)
-    style.configure('TCheckbutton', font=checkbox_current_font)
-    style.configure('TCombobox', font=current_font)
-    style.configure('TTreeview', font=current_font)
-    style.configure('TNotebook.Tab', font=current_font)
+    def update_checkboxes(self):
+        search_text = self.search_entry.text().lower()
+        for checkbox_name, checkbox in self.checkboxes.items():
+            checkbox.setVisible(search_text in checkbox_name.lower())
 
+    def get_tab_name(self, checkbox_name):
+        for tab_name, checkbox_names in tabs.items():
+            if checkbox_name in checkbox_names:
+                return tab_name
+        return None  # return None if the checkbox name is not found in any tab
 
-# Функция для обновления текущего шрифта
-def update_font(event=None):
-    global checkbox_current_font
-    font_family = font_family_var.get()
-    checkbox_font_size = font_size_var.get()
-    checkbox_current_font = (font_family, checkbox_font_size)
-    update_font_style()
-    config['General']['font_family'] = font_family
-    config['General']['checkbox_font_size'] = str(checkbox_font_size)
-    with open('settings.ini', 'w') as configfile:
-        config.write(configfile)
+    def select_all_in_tab(self, tab_name):
+        """Выделяет или снимает выделение со всех чекбоксов в указанной вкладке"""
+        # Определяем текущее состояние (если хоть один не отмечен - будем отмечать все)
+        any_unchecked = any(not checkbox.isChecked() 
+                           for checkbox in self.checkboxes[tab_name].values())
+        
+        # Устанавливаем новое состояние для всех чекбоксов
+        for checkbox in self.checkboxes[tab_name].values():
+            checkbox.setChecked(any_unchecked)
 
-# Функция для обновления текущей темы
-def update_theme(event=None):
-    global current_theme
-    new_theme = theme_var.get()
-    if new_theme != current_theme:
-        root.style.theme_use(new_theme)
-        current_theme = new_theme
-
-        # Сохраняем текущий шрифт
-        font_family = config['General']['font_family']
-        checkbox_font_size = int(config['General']['checkbox_font_size'])
-        checkbox_current_font = (font_family, checkbox_font_size)
-
-        # Обновляем шрифт после смены темы
-        update_font_style()
-
-        config['General']['theme'] = new_theme
-        with open('settings.ini', 'w') as configfile:
-            config.write(configfile)
-
-# Создаем фрейм для размещения ползунка, выпадающих списков для шрифта и темы
-font_and_theme_controls_frame = ttk.Frame(root)
-font_and_theme_controls_frame.pack(side='bottom', anchor='se', padx=10, pady=(0, 10))
-
-# Выпадающий список для выбора функции кнопки "Выполнить"
-execute_function_var = tk.StringVar()
-if 'Execute' in config and 'execute_function' in config['Execute']:
-    execute_function_var.set(config['Execute']['execute_function'])
-else:
-    execute_function_var.set('Выполнить')
-
-execute_function_values = ['Создать конфиг', 'Выполнить']
-execute_function_dropdown = ttk.Combobox(font_and_theme_controls_frame, textvariable=execute_function_var, values=execute_function_values)
-execute_function_dropdown.pack(side='left', padx=(0, 5))
-
-# Функция для обновления значения execute_function
-def update_execute_function(event=None):
-    config.set('Execute', 'execute_function', execute_function_var.get())
-    with open('settings.ini', 'w') as configfile:
-        config.write(configfile)
-
-execute_function_dropdown.bind('<<ComboboxSelected>>', update_execute_function)
-
-# Выпадающий список для выбора файла конфигурации
-config_file_var = tk.StringVar()
-config_file_values = [f for f in os.listdir('Configs') if f.endswith('.bat')]
-config_file_frame = ttk.Frame(font_and_theme_controls_frame)
-config_file_dropdown = ttk.Combobox(config_file_frame, textvariable=config_file_var, values=config_file_values)
-config_file_dropdown.pack(side='left', padx=(0, 5))
-
-# Увеличиваем ширину выпадающего списка в два раза
-config_file_dropdown.config(width=int(len(max(config_file_values, key=len))*float(config['General']['size_of_the_config_field'])))
-
-# Установка значения по умолчанию
-default_config = 'Конфиг оптимизации от разработчика.bat'
-if default_config in config_file_values:
-    config_file_var.set(default_config)
-
-def execute_config():
-    selected_file = config_file_var.get()
-    if selected_file:
-        subprocess.call(f'Configs\\{selected_file}', shell=True)
-
-execute_config_button = ttk.Button(config_file_frame, text='Выполнить конфиг', command=execute_config)
-execute_config_button.pack(side='left', padx=(0, 5))
-
-config_file_frame.pack(side='left', padx=(0, 5))
-
-# Выпадающий список для выбора шрифта
-font_family_var = tk.StringVar(value='GitHub: scode18')
-font_family_values = ['Rust', 'Foxy', 'Frizon', 'Velocity', 'Roboto', 'Montserrat', 'Lato', 'Open Sans', 'Nunito', 'Arial', 'Times New Roman', 'Verdana', 'Georgia', 'Courier New', 'Ubuntu', 'Ubuntu Mono', 'Ubuntu Condensed', 'Ubuntu Light', 'Ubuntu Bold', 'System', 'Terminal', 'Small Fonts', 'Fixedsys', 'hooge 05_53', 'hooge 05_54', 'hooge 05_55']
-font_family_dropdown = ttk.Combobox(font_and_theme_controls_frame, textvariable=font_family_var, values=font_family_values)
-font_family_dropdown.pack(side='right', padx=(5, 0))
-font_family_dropdown.bind('<<ComboboxSelected>>', update_font)
-
-# Ползунок для выбора размера шрифта
-font_size_var = tk.IntVar(value=12)
-font_size_slider = ttk.Scale(font_and_theme_controls_frame, variable=font_size_var, from_=8, to=12, orient='horizontal')
-font_size_slider.pack(side='right', padx=(0, 5))
-font_size_slider.bind('<ButtonRelease-1>', update_font)
-
-# Выпадающий список для выбора темы
-theme_var = tk.StringVar(value=current_theme)
-theme_values = root.style.theme_names()
-theme_dropdown = ttk.Combobox(font_and_theme_controls_frame, textvariable=theme_var, values=theme_values)
-theme_dropdown.pack(side='right', padx=(0, 5))
-theme_dropdown.bind("<<ComboboxSelected>>", update_theme)
-
-# Вызываем функцию для установки начального стиля
-update_font_style()
-
-# Создание кнопок
-execute_button = ttk.Button(root, text='Выполнить', command=execute)
-execute_button.pack(side='top', padx=config.getint('Execute_Button', 'padx'), pady=config.getint('Execute_Button', 'pady'), fill=config['Execute_Button']['fill'])
-
-# Создание вкладок
-tab_control = ttk.Notebook(root)
-
-# New code to add label "All Tweaker..." to the tab "search_entry.placemh"
-if 'Приватность' in tabs:
-    tab_frame = ttk.Frame(tab_control)
-    label = ttk.Label(tab_frame, text="""
-    All Tweaker Beta (scode18) — это утилита для тонкой настройки операционной системы и программного обеспечения, которая позволяет изменять определённые параметры для персонализации и оптимизации.
-    В ней объединены все лучшие твики, которые я нашел, включая Win 10 Tweaker, Booster X и другие.
-    All Tweaker позволяет настроить внешний вид графического интерфейса пользователя, а также оптимизировать производительность системы и приложений.""")
-    label.pack()
-    username = getpass.getuser()  # get the current username
-    tab_control.add(tab_frame, text=f'Привет, {username}')
-
-# Создание поля для поиска
-search_entry_var = StringVar()
-search_entry = ttk.Entry(root, textvariable=search_entry_var)
-search_entry.pack(side='top', padx=config.getint('Search_Entry', 'padx'), pady=config.getint('Search_Entry', 'pady'), fill=config['Search_Entry']['fill'])
-
-# Функция для обновления значения fullscreen
-def update_fullscreen():
-    config['Window']['fullscreen'] = str(root.attributes('-fullscreen'))
-    with open('settings.ini', 'w') as configfile:
-        config.write(configfile)
-
-# Функция для обновления значения width и height
-def update_window_size():
-    config['Window']['width'] = str(root.winfo_width())
-    config['Window']['height'] = str(root.winfo_height())
-    with open('settings.ini', 'w') as configfile:
-        config.write(configfile)
-
-def select_all_for_tabs(tab_frame):
-    select_all_checkbox_var = tk.BooleanVar()
-    select_all_checkbox = ttk.Checkbutton(tab_frame, text='Выделить всё', variable=select_all_checkbox_var)
-    # select_all_checkbox.grid(row=0, column=0, sticky='w')
-
-    def select_all():
-        select_state = select_all_checkbox_var.get()
-        for checkbox in checkboxes.values():
-            checkbox.set(select_state)
-
-    def update_checkboxes(*args):
-        entered_text = search_entry_var.get().lower()
-        for checkbox_name, checkbox_var in checkboxes.items():
-            if entered_text in checkbox_name.lower():
-                checkbox_var.set(True)
-            else:
-                checkbox_var.set(False)
-
-    select_all_checkbox.configure(command=select_all)
-    search_entry_var.trace_add('write', update_checkboxes)
-
-checkboxes = {}
-for tab_name, checkbox_names in tabs.items():
-    tab_frame = ttk.Frame(tab_control)
-    tab_control.add(tab_frame, text=tab_name)
-
-    canvas = tk.Canvas(tab_frame, width=800, height=600)
-    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-
-    scrollbar = ttk.Scrollbar(tab_frame, orient=tk.VERTICAL, command=canvas.yview)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-    canvas.configure(yscrollcommand=scrollbar.set)
-
-    inner_frame = ttk.Frame(canvas)
-    canvas.create_window((0, 0), window=inner_frame, anchor='nw')
-
-    if tab_name:
-        select_all_for_tabs(inner_frame)
-
-    num_columns = 2
-    if tab_name == 'База':
-        num_columns = 4
-    elif tab_name == 'Обновления':
-        num_columns = 1
-    elif tab_name == 'Поддержка':
-        num_columns = 1
-    elif tab_name == 'Программы':
-        num_columns = 3
-
-    for i, checkbox_name in enumerate(checkbox_names):
-        checkbox_var = tk.BooleanVar()
-        checkbox = ttk.Checkbutton(inner_frame, text=checkbox_name, variable=checkbox_var)
-        checkbox.grid(row=i//num_columns+1, column=i%num_columns, sticky='w')
-        checkboxes[checkbox_name] = checkbox_var
-
-    inner_frame.update_idletasks()
-    canvas.config(scrollregion=canvas.bbox("all"))
-
-canvas = tk.Canvas(tab_frame, width=800, height=600)
-canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-
-scrollbar = ttk.Scrollbar(tab_frame, orient=tk.VERTICAL, command=canvas.yview)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-canvas.configure(yscrollcommand=scrollbar.set)
-
-inner_frame = ttk.Frame(canvas)
-canvas.create_window((0, 0), window=inner_frame, anchor='nw')
-
-# Размещение элементов
-tab_control.pack(expand=1, fill='both', padx=10, pady=10)
-
-# Запуск окна
-root.mainloop()
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
