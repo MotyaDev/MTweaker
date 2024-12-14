@@ -1,10 +1,12 @@
-# [All Tweaker: Универсальный инструмент для тонкой настройки Windows](https://shre.su/0KO3)
+# [MTweaker: Универсальный инструмент для тонкой настройки Windows]
 ![GitHub Tag](https://img.shields.io/github/v/tag/scode18/All-Tweaker?style=for-the-badge&label=release)
 ![PyPI - Version](https://img.shields.io/pypi/v/ttkbootstrap?style=for-the-badge&label=ttkbootstrap)
 ![GitHub repo size](https://img.shields.io/github/repo-size/scode18/All-Tweaker?style=for-the-badge)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/scode18/All-Tweaker/total?style=for-the-badge)
 <br>
-[All Tweaker](https://shre.su/0KO3) — это мощная утилита для персонализации и оптимизации операционной системы Windows. Этот инструмент объединяет в себе более 100 различных твиков, позволяющих изменять параметры системы и программного обеспечения для достижения максимальной производительности и комфорта использования.
+[MTweaker] — это мощная утилита для персонализации и оптимизации операционной системы Windows. Этот инструмент объединяет в себе более 100 различных твиков, позволяющих изменять параметры системы и программного обеспечения для достижения максимальной производительности и комфорта использования.
+
+##!!!!! МЫ НЕ СКОПИРОВАЛИ ПРОГРАММУ А ЛИШЬ ПОФИКСИЛИ ЕЕ СМЕНИВ ИНТЕРФЕЙС НА PYSIDE6, ДОБАВИЛИ ПРОГРЕСС БАР И МУЛТИПОТОК! МЫ НЕ СКОПИРОВАЛИ ПРОГУ!
 
 [All.Tweaker.Beta.exe](https://shre.su/0KO3)
 ```batch
