@@ -7,8 +7,8 @@ REM Загружаем All Tweaker с GitHub
 taskkill /im py.exe /f
 del All.Tweaker.py
 rem del tabs.py
-Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.py
-rem Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/tabs.py
+REM Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.py
+REM rem Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/tabs.py
 
 rem Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.featuring.Howdy.Ho.py
 rem Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.Start.bat
