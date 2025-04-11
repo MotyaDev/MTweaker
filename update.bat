@@ -31,7 +31,7 @@ Utils\aria2c https://github.com/MotyaDev/MTweaker/raw/main/All.Tweaker.py
 Utils\aria2c https://github.com/scode18/All-Tweaker/raw/main/cleaning.py
 Utils\aria2c https://github.com/scode18/All-Tweaker/raw/main/settings.ini
 
-REM Utils\\aria2c https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.Start.bat
+Utils\\aria2c https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.Start.bat
 cd Utils
 aria2c https://github.com/scode18/All-Tweaker/raw/main/Utils/elevator.exe
 aria2c https://github.com/scode18/All-Tweaker/raw/main/Utils/launcher.exe
