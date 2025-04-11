@@ -27,7 +27,7 @@ Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/LICENSE
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/tweaks.7z
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/icon.ico
 REM Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/install.bat
-REM Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.py
+Utils\busybox wget https://github.com/MotyaDev/MTweaker/raw/main/All.Tweaker.py
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/cleaning.py
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/settings.ini
 
