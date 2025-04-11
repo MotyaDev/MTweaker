@@ -22,16 +22,16 @@ if %errorlevel% equ 0 (
 )
 
 REM Загружаем All Tweaker с GitHub
-del install.bat
+REM del install.bat
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/LICENSE
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/tweaks.7z
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/icon.ico
-Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/install.bat
-Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.py
+REM Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/install.bat
+REM Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.py
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/cleaning.py
 Utils\busybox wget https://github.com/scode18/All-Tweaker/raw/main/settings.ini
 
-Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.Start.bat
+REM Utils\\busybox wget https://github.com/scode18/All-Tweaker/raw/main/All.Tweaker.Start.bat
 cd Utils
 busybox wget https://github.com/scode18/All-Tweaker/raw/main/Utils/elevator.exe
 busybox wget https://github.com/scode18/All-Tweaker/raw/main/Utils/launcher.exe
